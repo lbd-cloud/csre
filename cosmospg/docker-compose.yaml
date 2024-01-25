@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  validator1:
+    image: simd:v0.45.4
+    volumes:
+      - ./validators/validator1:/root/.simapp
+    command: simd start --home /root/.simapp --address tcp://0.0.0.0:26656 --rpc.laddr tcp://0.0.0.0:26657
+    ports:
+      - "26656-26657:26656-26657"
+    networks:
+      - cosmos-network
+
+  validator2:
+    image: simd:v0.45.4
+    volumes:
+      - ./validators/validator2:/root/.simapp
+    command: simd start --home /root/.simapp --address tcp://0.0.0.0:26656 --rpc.laddr tcp://0.0.0.0:26657
+    ports:
+      - "26659-26660:26656-26657"
+    networks:
+      - cosmos-network
+
+networks:
+  cosmos-network:
+    driver: bridge
