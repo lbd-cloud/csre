@@ -2,13 +2,14 @@
 
 # Network and version settings
 CHAIN_ID=csre-1
+DENOM=csre
 
 IMAGE_NAME=simd:latest
 
 # Validator and account settings
 VALIDATOR1_NAME=validator1
 VALIDATOR2_NAME=validator2
-GENESIS_ACCOUNT_AMOUNT=10000000000stake
+GENESIS_ACCOUNT_AMOUNT=10000000000000csre
 DOCKER_VOLUME_PATH=$(PWD)/validators
 
 # Build the docker image
@@ -53,14 +54,14 @@ init-network: clean generate-all-keys
 	$(eval VALIDATOR2_ADDRESS=$(shell docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR2_NAME):/root/.simapp --entrypoint cat $(IMAGE_NAME) /root/.simapp/$(VALIDATOR2_NAME)_address.txt | tr -d '\n'))
 
         # Initialize the genesis file and add genesis account for Validator 1
-	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR1_NAME):/root/.simapp $(IMAGE_NAME) simd init $(VALIDATOR1_NAME) --home /root/.simapp --chain-id $(CHAIN_ID)
-	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR1_NAME):/root/.simapp $(IMAGE_NAME) simd genesis add-genesis-account $(VALIDATOR1_ADDRESS) $(GENESIS_ACCOUNT_AMOUNT) --home /root/.simapp --keyring-backend test
+	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR1_NAME):/root/.simapp $(IMAGE_NAME) simd init --default-denom $(DENOM) $(VALIDATOR1_NAME) --home /root/.simapp --chain-id $(CHAIN_ID)
+	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR1_NAME):/root/.simapp $(IMAGE_NAME) simd genesis add-genesis-account $(VALIDATOR1_ADDRESS) $(GENESIS_ACCOUNT_AMOUNT) 
 
         # Create gentx for Validator 1
 	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR1_NAME):/root/.simapp $(IMAGE_NAME) simd genesis gentx $(VALIDATOR1_NAME) $(GENESIS_ACCOUNT_AMOUNT) --home /root/.simapp --chain-id $(CHAIN_ID) --keyring-backend test
 
         # Initialize the genesis file and add genesis account for Validator 2
-	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR2_NAME):/root/.simapp $(IMAGE_NAME) simd init $(VALIDATOR2_NAME) --home /root/.simapp --chain-id $(CHAIN_ID)
+	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR2_NAME):/root/.simapp $(IMAGE_NAME) simd init --default-denom $(DENOM) $(VALIDATOR2_NAME) --home /root/.simapp --chain-id $(CHAIN_ID)
 	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR2_NAME):/root/.simapp $(IMAGE_NAME) simd genesis add-genesis-account $(VALIDATOR2_ADDRESS) $(GENESIS_ACCOUNT_AMOUNT) --home /root/.simapp --keyring-backend test
 
         # Create gentx for Validator 2
@@ -98,31 +99,43 @@ test-network:
 		echo "Error: Failed to retrieve accounta address"; \
 		exit 1; \
 	fi
-        # Check balance of the Genesis account
-	@echo "Checking balance of the Genesis account..."
-	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR1_NAME):/root/.simapp $(IMAGE_NAME) simd query bank balances $(VALIDATOR1_ADDRESS) --home /root/.simapp
+	# Check balance of the Genesis account
+	@docker exec -it --privileged validator1 simd query bank balances $(VALIDATOR1_ADDRESS) --home /root/client
 
 	# Check balance of accounta
 	@echo "Checking balance of accounta..."
-	@docker run --rm -v $(DOCKER_VOLUME_PATH)/accounta:/root/.simapp $(IMAGE_NAME) simd query bank balances $(ACCOUNT_A_ADDRESS) --home /root/.simapp
+	@docker exec -it --privileged validator1 simd query bank balances $(ACCOUNT_A_ADDRESS) --keyring-backend test
 
 	# Execute transaction from Genesis account to accounta
 	@echo "Executing transaction from Genesis account to accounta..."
-	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR1_NAME):/root/.simapp $(IMAGE_NAME) simd tx bank send $(VALIDATOR1_ADDRESS) $(ACCOUNT_A_ADDRESS) 100000stake --from $(VALIDATOR1_NAME) --keyring-backend test --home /root/.simapp -y
+	@docker exec -it validator1 simd  tx bank send $(VALIDATOR1_ADDRESS) $(ACCOUNT_A_ADDRESS) 1000000csre --from $(VALIDATOR1_NAME) --keyring-backend test --home /root/.simapp --chain-id $(CHAIN_ID) --yes 
 
 	# Check balance of the Genesis account again
 	@echo "Checking balance of the Genesis account again..."
-	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR1_NAME):/root/.simapp $(IMAGE_NAME) simd query bank balances $(VALIDATOR1_ADDRESS) --home /root/.simapp
+	@docker exec validator1 simd query bank balances $(VALIDATOR1_ADDRESS) 
 
 	# Check balance of accounta again
 	@echo "Checking balance of accounta again..."
-	@docker run --rm -v $(DOCKER_VOLUME_PATH)/accounta:/root/.simapp $(IMAGE_NAME) simd query bank balances $(ACCOUNT_A_ADDRESS) --home /root/.simapp
+	@docker exec validator1 simd query bank balances $(ACCOUNT_A_ADDRESS)
 
+# Add a new validator (validator3)
+add-validator3:
+	@if [ -z "$(VALIDATOR3_NAME)" ]; then \
+		echo "No VALIDATOR3_NAME provided. Exiting..."; \
+		exit 1; \
+	fi
+	@echo "Adding validator3..."
+	@docker run --rm -v $(DOCKER_VOLUME_PATH)/$(VALIDATOR3_NAME):/root/.simapp $(IMAGE_NAME) sh -c \
+	"simd keys add $(VALIDATOR3_NAME) --keyring-backend test > /root/.simapp/$(VALIDATOR3_NAME)_output.txt && \
+	cat /root/.simapp/$(VALIDATOR3_NAME)_output.txt | grep 'address:' | awk '{print \$$3}' > /root/.simapp/$(VALIDATOR3_NAME)_address.txt"
+
+	@echo "Address for $(VALIDATOR3_NAME):"
+	@cat $(DOCKER_VOLUME_PATH)/$(VALIDATOR3_NAME)/$(VALIDATOR3_NAME)_address.txt || echo "Address file not found on host."
 
 # Start the network
 start-network:
 	@echo "Starting network with 2 validatos ..."
-	@docker-compose up -d validator1 validator2
+	@docker compose up -d validator1 validator2
 
 # Stop the network
 stop-network:

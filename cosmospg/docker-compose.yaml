@@ -2,7 +2,8 @@ version: '3.8'
 
 services:
   validator1:
-    image: simd:v0.45.4
+    image: simd:latest
+    container_name: validator1
     volumes:
       - ./validators/validator1:/root/.simapp
     command: simd start --home /root/.simapp --address tcp://0.0.0.0:26656 --rpc.laddr tcp://0.0.0.0:26657
@@ -12,9 +13,21 @@ services:
       - cosmos-network
 
   validator2:
-    image: simd:v0.45.4
+    image: simd:latest
+    container_name: validator2
     volumes:
       - ./validators/validator2:/root/.simapp
+    command: simd start --home /root/.simapp --address tcp://0.0.0.0:26656 --rpc.laddr tcp://0.0.0.0:26657
+    ports:
+      - "26659-26660:26656-26657"
+    networks:
+      - cosmos-network
+      
+  validator3:
+    image: simd:latest
+    container_name: validator3
+    volumes:
+      - ./validators/validator3:/root/.simapp
     command: simd start --home /root/.simapp --address tcp://0.0.0.0:26656 --rpc.laddr tcp://0.0.0.0:26657
     ports:
       - "26659-26660:26656-26657"
