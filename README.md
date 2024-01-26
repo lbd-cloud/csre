@@ -68,5 +68,5 @@ The `cosmospg` folder includes configurations and a Makefile for setting up and 
 
 ### Detailed Instructions
 
-For detailed instructions on the setup, configuration options, and testing procedures, refer to the [`cosmos.md`](cosmospg/cosmos.md) file in the `cosmospg` directory. This document provides comprehensive guidance on working with the Cosmos Devnet environment.
+For detailed instructions on the setup, configuration options, and testing procedures, refer to the [`cosmos.md`](doc/cosmos.md) file in the `cosmospg` directory. This document provides comprehensive guidance on working with the Cosmos Devnet environment.
 
