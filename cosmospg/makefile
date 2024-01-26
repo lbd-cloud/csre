@@ -1,9 +1,9 @@
-.PHONY: build init-network generate-keys start-network stop-network clean
+.PHONY: build init-network generate-keys start-network stop-network clean full-test
 
 # Network and version settings
 CHAIN_ID=csre-1
 
-IMAGE_NAME=simd:v0.45.4
+IMAGE_NAME=simd:latest
 
 # Validator and account settings
 VALIDATOR1_NAME=validator1
@@ -15,6 +15,14 @@ DOCKER_VOLUME_PATH=$(PWD)/validators
 build:
 	@echo "Building custom Cosmos SDK image..."
 	@docker build -t $(IMAGE_NAME) .
+
+# Full test: Generate keys, initialize network, start network, wait, and then test the network
+full-test: generate-all-keys init-network start-network wait-for-network test-network
+
+wait-for-network:
+	@echo "Waiting for network to be ready..."
+	@sleep 30 # Waits for 30 seconds
+
 
 # Generate keys for a validator
 generate-keys:
@@ -77,9 +85,7 @@ init-network: clean generate-all-keys
 test-network:
 	# Create accounta and get its address
 	@echo "Creating accounta..."
-	@docker run --rm -v $(DOCKER_VOLUME_PATH)/accounta:/root/.simapp $(IMAGE_NAME) simd keys add csreaccount --home /root/.simapp --keyring-backend test
-	@echo "Retrieving address for accounta..."
-	$(eval ACCOUNT_A_ADDRESS=$(shell docker run --rm -v $(DOCKER_VOLUME_PATH)/accounta:/root/.simapp $(IMAGE_NAME) simd keys show csreaccount --address --home /root/.simapp --keyring-backend test))
+	$(eval ACCOUNT_A_ADDRESS=$(shell docker run --rm -v $(DOCKER_VOLUME_PATH)/accounta:/root/.simapp $(IMAGE_NAME) simd keys add csreaccount --home /root/.simapp --keyring-backend test | grep -o 'cosmos[[:alnum:]]*' | head -n 1))
 	@echo "accounta address: $(ACCOUNT_A_ADDRESS)"
 
 	@if [ -z "$(ACCOUNT_A_ADDRESS)" ]; then \
@@ -110,17 +116,15 @@ test-network:
 
 # Start the network
 start-network:
-	@echo "Starting network..."
-	@echo "docker-compose up -d"
-	@docker-compose up -d
+	@echo "Starting network with 2 validatos ..."
+	@docker-compose up -d validator1 validator2
 
 # Stop the network
 stop-network:
 	@echo "Stopping network..."
-	@echo "docker-compose down"
 	@docker-compose down
 
 # Clean up the environment
 clean:
 	@echo "Cleaning up..."
-	@docker run --rm -v $(DOCKER_VOLUME_PATH):/data --user root $(IMAGE_NAME) rm -rf /data/*
+	@docker run --rm -v $(DOCKER_VOLUME_PATH):/data --user root $(IMAGE_NAME) rm -rf /data/* /data/*/* /data/*/*/*
